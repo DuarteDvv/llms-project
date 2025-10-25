@@ -6,6 +6,7 @@ from langgraph.graph.message import add_messages
 class StateSchema(TypedDict):
 
     messages: Annotated[list, add_messages]
+    route: Optional[str]
 
 
 
