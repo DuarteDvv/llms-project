@@ -7,11 +7,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-2.5-flash-lite"
 
 
-
-llm =  ChatGoogleGenerativeAI(
+llm_ =  ChatGoogleGenerativeAI(
     api_key=os.getenv("GOOGLE_API_KEY"),
     model=MODEL_NAME,
     temperature=0,
@@ -27,7 +26,7 @@ class Subqueries(BaseModel):
 
 @tool
 def retrieve_information(query: str) -> str:
-    """Retorna documentos informacoes confiaveis e relevantes sobre aspectos da menopausa.
+    """Retorna documentos com informacoes confiaveis e relevantes sobre aspectos da menopausa.
     Esta ferramenta é útil para obter informações detalhadas sobre sintomas, tratamentos,
     impacto na saúde mental, dicas de estilo de vida e outros tópicos relacionados à saúde da mulher durante a menopausa.
     Args:
@@ -36,14 +35,18 @@ def retrieve_information(query: str) -> str:
         str: Documentos informativos relevantes sobre a consulta.
 
     """
-
-    response = llm.with_structured_output(Subqueries).invoke([
-        HumanMessage(content=f"Divida a seguinte consulta em três subconsultas distintas e relevantes que complementem a original: {query}")
+    
+    response = llm_.with_structured_output(Subqueries).invoke([
+       HumanMessage(content=f"Divida a seguinte consulta em três subconsultas distintas e relevantes que complementem a original: {query}")
     ])
 
 
-    return "\n".join([response.subquery1, response.subquery2, response.subquery3])
+    re = """ Documentos recuperados para a consulta original e suas subconsultas:\n
 
+    A menopausa depressao se relaciona com a menopausa por causa do hormonio ycte que influencia o humor...
+    """
+
+    return re
 
 #retrieve.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?")
 

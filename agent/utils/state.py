@@ -8,6 +8,11 @@ class StateSchema(TypedDict):
     messages: Annotated[list, add_messages]
     route: Optional[str]
 
+    user_data: Optional[Dict[str, Any]]
+    debug: Optional[Any]
+    confirmation: Optional[bool]
+    
+
 
 
     
