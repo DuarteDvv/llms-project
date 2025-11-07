@@ -1,5 +1,5 @@
 from langgraph.prebuilt import ToolNode, tools_condition
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -20,7 +20,7 @@ interruptConfig = HumanInterruptConfig(
     allow_accept=False     # não permite aceitação direta
 )
 
-MODEL_NAME = "gemini-2.5-flash-lite"
+MODEL_NAME = "gemini-2.5-flash"
 
 def create_agent_graph():
 
@@ -28,7 +28,7 @@ def create_agent_graph():
         api_key=os.getenv("GOOGLE_API_KEY"),
         model=MODEL_NAME,
         temperature=0,
-        max_tokens=2048,
+        max_tokens=10000,
         timeout=None,
         max_retries=2,            
     )
@@ -80,6 +80,31 @@ def create_agent_graph():
         return {
             "messages": [AIMessage(content="Antes de prosseguirmos, gostaria de fazer algumas perguntas para personalizar melhor o guia para você.")]
         }
+    
+    def ask_email(state: StateSchema) -> StateSchema:
+
+        question = "Qual é o seu email? (Usaremos para enviar o guia personalizado)"
+
+        request = HumanInterrupt(
+            action_request=ActionRequest(
+                action=question,
+                args={}
+            ),
+            config=interruptConfig
+        )
+
+        answer = interrupt([request])[0]
+
+        if answer["type"] == "ignore":
+            answer = "Não informado"
+        else:
+            answer = answer["args"]
+
+        user_data = state.get("user_data", {})       
+        user_data["email"] = answer
+        state["user_data"] = user_data
+
+        return state
     
     def ask_name(state: StateSchema) -> StateSchema:
 
@@ -309,24 +334,104 @@ def create_agent_graph():
         system_message = SystemMessage(content=GUIDE_SYSTEM_PROMPT)
 
         prompt_parts = [
-            "Com base nas seguintes informações do usuário, gere um guia estruturado para discutir com um médico sobre menopausa:\n"
+            "Crie um guia personalizado de menopausa com base nas seguintes informações:\n\n"
         ]
 
-        for key, value in user_data.items():
-            pretty_key = key.replace("_", " ").capitalize()
-            prompt_parts.append(f"{pretty_key}: {value}\n")
+        # Filtrar campos que não devem ser incluídos no prompt
+        filtered_data = {k: v for k, v in user_data.items() if k != "guide"}
+
+        if not filtered_data or len(filtered_data) == 0:
+            # Se não houver dados, criar um guia genérico
+            prompt_parts.append("Informações do paciente: Dados não informados\n")
+        else:
+            for key, value in filtered_data.items():
+                pretty_key = key.replace("_", " ").capitalize()
+                # Evitar valores muito longos que possam causar problemas
+                if isinstance(value, str) and len(value) > 1000:
+                    value = value[:1000] + "..."
+                # Sanitizar o valor para evitar problemas com caracteres especiais
+                if value and value != "Não informado":
+                    prompt_parts.append(f"- {pretty_key}: {value}\n")
 
         prompt_parts.append(
-            "\nO guia deve incluir pontos principais, perguntas a serem feitas ao médico e quaisquer preocupações relevantes."
+            "\nGere o guia completo seguindo EXATAMENTE o formato especificado no system prompt, "
+            "incluindo os marcadores [INICIO_GUIA] e [FIM_GUIA]."
         )
 
         user_message = HumanMessage(content="".join(prompt_parts))
 
-        response = llm.invoke([system_message, user_message])
+        try:
+            print(f"[DEBUG] Gerando guia com dados: {filtered_data}")
+            
+            response = llm.invoke([system_message, user_message])
+            
+            if not response or not response.content:
+                # Fallback se não houver conteúdo
+                fallback_guide_content = (
+                    "# Guia Personalizado para Consulta sobre Menopausa\n\n"
+                    "## 📋 Informações da Paciente\n"
+                    "Informações não fornecidas.\n\n"
+                    "## 🔍 Resumo da Situação Atual\n"
+                    "Este guia foi criado para ajudá-la a preparar sua consulta médica sobre menopausa.\n\n"
+                    "## 🩺 Sintomas e Observações\n"
+                    "- Sintomas não especificados\n\n"
+                    "## ❓ Perguntas Importantes para o Médico\n"
+                    "1. Quais são os sintomas mais comuns da menopausa?\n"
+                    "2. Quais tratamentos estão disponíveis para mim?\n"
+                    "3. Como posso melhorar minha qualidade de vida durante este período?\n"
+                    "4. Existem mudanças no estilo de vida que você recomenda?\n"
+                    "5. Quando devo retornar para acompanhamento?\n\n"
+                    "## 💡 Recomendações de Bem-Estar\n"
+                    "- Mantenha uma alimentação equilibrada rica em cálcio e vitamina D\n"
+                    "- Pratique exercícios físicos regularmente\n"
+                    "- Cuide da saúde mental e busque apoio quando necessário\n"
+                    "- Mantenha-se hidratada\n\n"
+                    "## 📌 Próximos Passos\n"
+                    "- Anote qualquer sintoma novo antes da consulta\n"
+                    "- Leve este guia impresso ou em formato digital\n"
+                    "- Não hesite em fazer todas as suas perguntas ao médico\n\n"
+                    "---\n"
+                    "*Este guia foi gerado para auxiliar na preparação da sua consulta médica.*"
+                )
+                
+                full_response = (
+                    f"[INICIO_GUIA]\n{fallback_guide_content}\n[FIM_GUIA]\n\n"
+                    "Pronto! Seu guia personalizado foi gerado com sucesso! 📋✨ "
+                    "Gostaria que eu enviasse este guia para o seu email?"
+                )
+                
+                response = AIMessage(content=full_response)
+            
+            # Extrair apenas o conteúdo do guia (entre os marcadores)
+            content = response.content
+            guide_content = content
+            
+            if "[INICIO_GUIA]" in content and "[FIM_GUIA]" in content:
+                start_idx = content.find("[INICIO_GUIA]") + len("[INICIO_GUIA]")
+                end_idx = content.find("[FIM_GUIA]")
+                guide_content = content[start_idx:end_idx].strip()
+            
+            # Salvar apenas o conteúdo do guia (sem marcadores) no state
+            if "user_data" not in state:
+                state["user_data"] = {}
+            state["user_data"]["guide"] = guide_content
+            
+            print(f"[DEBUG] Guia salvo com {len(guide_content)} caracteres")
 
-        return {
-            "messages": [response]
-        }
+            return {
+                "messages": [response],
+                "user_data": state["user_data"]
+            }
+        except Exception as e:
+            print(f"[ERROR] Erro ao gerar guia: {str(e)}")
+           
+            error_message = AIMessage(
+                content=f"Desculpe, houve um problema ao gerar o guia. Por favor, tente novamente mais tarde. Se o problema persistir, entre em contato com o suporte."
+            )
+            return {
+                "messages": [error_message],
+                "user_data": state.get("user_data", {})
+            }
 
     tool_node = ToolNode(tools=TOOLS_CHAT, name="tools_chat")
     
@@ -335,6 +440,7 @@ def create_agent_graph():
     graph.add_node(tool_node, name="tools_chat")
     graph.add_node(router_node, name="router_node")
     graph.add_node(guide_node, name="guide_node")
+    graph.add_node(ask_email, name="ask_email")
     graph.add_node(ask_age, name="ask_age")
     graph.add_node(ask_name, name="ask_name")
     graph.add_node(ask_period, name="ask_period")
@@ -350,7 +456,8 @@ def create_agent_graph():
  
     graph.add_edge("welcome_node", END)
     graph.add_edge("chat_node", END)
-    graph.add_edge("guide_node", "ask_name")
+    graph.add_edge("guide_node", "ask_email")
+    graph.add_edge("ask_email", "ask_name")
     graph.add_edge("ask_name", "ask_age")
     graph.add_edge("ask_age", "ask_period")
     graph.add_edge("ask_period", "ask_sintomas")
@@ -363,12 +470,12 @@ def create_agent_graph():
     graph.add_conditional_edges("chat_node", tools_condition, {"tools": "tools_chat", "__end__": "__end__"})
 
 
-    def data_condition(state:  StateSchema) -> Literal["ask_name", "generate_guide"]:
+    def data_condition(state:  StateSchema) -> Literal["ask_email", "generate_guide"]:
 
         if state.get("confirmation"):
             return "generate_guide"
         else:
-            return "ask_name"
+            return "ask_email"
 
     graph.add_conditional_edges("ask_confirmation", data_condition)
 
@@ -391,9 +498,7 @@ def create_agent_graph():
     graph.add_conditional_edges("router_node", route_condition)
 
 
-    saver = None #InMemorySaver()
-
-    compiled_graph = graph.compile(checkpointer=saver if saver else None)
+    compiled_graph = graph.compile()
 
 
     return compiled_graph

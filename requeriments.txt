@@ -1,0 +1,5 @@
+langchain
+langgraph
+langgraph-api 
+markdown    
+weasyprint 
