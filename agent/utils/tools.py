@@ -13,9 +13,13 @@ from langchain.messages import HumanMessage, SystemMessage
 from dotenv import load_dotenv
 from langchain.tools import tool, ToolRuntime
 from langgraph.prebuilt.interrupt import HumanInterrupt, HumanInterruptConfig, ActionRequest
-from langgraph.types import interrupt, Command
+from qdrant_client import QdrantClient
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 load_dotenv()
+
+qdrant_client = QdrantClient()
 
 MODEL_NAME = "gemini-2.5-flash-lite"
 
@@ -46,17 +50,88 @@ def retrieve_information(query: str) -> str:
 
     """
     
+    subquery_prompt = f"""Você é um especialista em reformular consultas para sistemas de busca semântica sobre menopausa e saúde da mulher.
+
+        Dada a consulta original abaixo, crie TRÊS subconsultas distintas que COMPLEMENTEM e EXPANDAM a busca original. 
+
+        ESTRATÉGIAS para criar boas subconsultas:
+        1. **Aspecto médico/científico**: Foque nos mecanismos biológicos, hormônios, processos fisiológicos
+        2. **Aspecto prático/tratamento**: Foque em tratamentos, terapias, medicamentos, alternativas
+        3. **Aspecto específico/relacionado**: Foque em consequências, sintomas relacionados, impactos na vida
+
+        REGRAS IMPORTANTES:
+        - Cada subconsulta deve abordar um ÂNGULO DIFERENTE do tema
+        - Use termos médicos e sinônimos relevantes
+        - Seja específico e direto
+        - NÃO repita a consulta original
+        - Pense em aspectos que um médico consideraria relacionados
+
+        CONSULTA ORIGINAL: {query}
+
+        Gere as três subconsultas complementares:
+        
+        """
+            
     response = llm_.with_structured_output(Subqueries).invoke([
-       HumanMessage(content=f"Divida a seguinte consulta em três subconsultas distintas e relevantes que complementem a original: {query}")
+       HumanMessage(content=subquery_prompt)
     ])
 
+    print(f"[DEBUG] Query original: {query}")
+    print(f"[DEBUG] Subquery 1: {response.subquery1}")
+    print(f"[DEBUG] Subquery 2: {response.subquery2}")
+    print(f"[DEBUG] Subquery 3: {response.subquery3}")
 
-    re = """ Documentos recuperados para a consulta original e suas subconsultas:\n
+    queries_to_search = [
+        ("original", query),
+        ("subquery1", response.subquery1),
+        ("subquery2", response.subquery2),
+        ("subquery3", response.subquery3)
+    ]
 
-    A menopausa depressao se relaciona com a menopausa por causa do hormonio ycte que influencia o humor...
-    """
+    def search_single_query(query_info):
+        """Busca documentos para uma única query no Qdrant"""
+        query_type, query_text = query_info
+        try:
 
-    return re
+            # Exemplo de como seria:
+            # results = qdrant_client.search(
+            #     collection_name="menopausa_docs",
+            #     query_vector=get_embedding(query_text),  # função para gerar embedding
+            #     limit=5
+            # )
+            
+            
+            return {
+                "query_type": query_type,
+                "query_text": query_text,
+                "results": f"[Documentos encontrados para: {query_text}]"
+            }
+        except Exception as e:
+            print(f"[ERROR] Erro ao buscar {query_type}: {str(e)}")
+            return {
+                "query_type": query_type,
+                "query_text": query_text,
+                "results": f"[Erro na busca: {str(e)}]"
+            }
+
+    # 4 buscas em paralelo 
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        search_results = list(executor.map(search_single_query, queries_to_search))
+    
+    consolidated_results = []
+    for result in search_results:
+        consolidated_results.append(
+            f"\n--- {result['query_type'].upper()} ---\n"
+            f"Query: {result['query_text']}\n"
+            f"Resultados: {result['results']}\n"
+        )
+    
+    final_response = (
+        f"Documentos recuperados para a consulta original e suas subconsultas:\n"
+        f"{''.join(consolidated_results)}\n"
+    )
+
+    return final_response
 
 #retrieve.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?")
 
@@ -169,7 +244,7 @@ def send_pdf(runtime: ToolRuntime) -> str:
         
         # metadados do email
         msg = MIMEMultipart()
-        msg['Subject'] = '🌸 Seu Guia Personalizado sobre Menopausa'
+        msg['Subject'] = '🌸 Seu Guia Personalizado Para Consulta'
         msg['From'] = remetente
         msg['To'] = email
         
@@ -213,7 +288,7 @@ def send_pdf(runtime: ToolRuntime) -> str:
         pdf_attachment.add_header(
             'Content-Disposition', 
             'attachment', 
-            filename=f'guia_menopausa_{datetime.now().strftime("%Y%m%d")}.pdf'
+            filename=f'guia_consulta_{datetime.now().strftime("%Y%m%d")}.pdf'
         )
         msg.attach(pdf_attachment)
         

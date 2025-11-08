@@ -3,3 +3,4 @@ langgraph
 langgraph-api 
 markdown    
 weasyprint 
+qdrant_client

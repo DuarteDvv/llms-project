@@ -143,81 +143,22 @@ def create_agent_graph():
             config=interruptConfig
         )
 
-        while True:
-            answer = interrupt([request])[0]
+        answer = interrupt([request])[0]
 
-            if answer["type"] == "ignore":
-                answer = "Não informado"
-                break
-            else:
-                answer = int(answer["args"])
+        if answer["type"] == "ignore":
+            answer = "Não informado"
+        else:
+            answer = answer["args"]
 
-            if not isinstance(answer, int) or answer < 0:
-                question = "Por favor, insira uma idade válida. Qual é sua idade?"
-
-                request = HumanInterrupt(   
-                    action_request=ActionRequest(
-                        action=question,
-                        args={}
-                    ),
-                    config=interruptConfig
-                )
-                continue
-            else:               
-                break
-
-
-        user_data = state.get("user_data", {})       
+        user_data = state.get("user_data", {})
         user_data["idade"] = answer
         state["user_data"] = user_data
 
         return state
     
-    def ask_period(state: StateSchema) -> StateSchema:
+    def ask_ciclo_menstrual(state: StateSchema) -> StateSchema:
 
-        question = "Há quantos meses você não menstrua? Caso, já tenha passado por menopausa, por favor, informe quantos meses se passaram desde então."
-
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=interruptConfig
-        )
-
-        while True:
-            answer = interrupt([request])[0]
-
-            if answer["type"] == "ignore":
-                answer = "Não informado"
-                break
-            else:
-                answer = int(answer["args"])
-
-            if not isinstance(answer, int) or answer < 0:
-                question = "Por favor, insira um número válido de meses. Há quantos meses ?"
-
-                request = HumanInterrupt(   
-                    action_request=ActionRequest(
-                        action=question,
-                        args={}
-                    ),
-                    config=interruptConfig
-                )
-                continue
-            else:               
-                break
-
-
-        user_data = state.get("user_data", {})       
-        user_data["tempo_menopausa"] = answer
-        state["user_data"] = user_data
-
-        return state
-    
-    def ask_sintomas(state: StateSchema) -> StateSchema:
-
-        question = "Descreva em detalhes como você tem se sentido ultimamente. Quais sintomas você está enfrentando que te preocupam?"
+        question = "Como está o seu ciclo menstrual? (Quando foi sua última menstruação, ela tem sido regular em frequência e fluxo? Você já completou 12 meses consecutivos sem menstruar?)"
 
         request = HumanInterrupt(
             action_request=ActionRequest(
@@ -235,14 +176,14 @@ def create_agent_graph():
             answer = answer["args"]
 
         user_data = state.get("user_data", {})       
-        user_data["sintomas"] = answer
+        user_data["ciclo_menstrual"] = answer
         state["user_data"] = user_data
 
         return state
     
-    def ask_alimentacao(state: StateSchema) -> StateSchema:
+    def ask_sintomas_fisicos(state: StateSchema) -> StateSchema:
 
-        question = "Você tem se alimentado bem ultimamente? Quais alimentos você tem consumido com mais frequência?"
+        question = "Quais sintomas físicos novos ou incômodos você tem sentido? (Por exemplo: ondas de calor, suores noturnos, alterações no sono, cansaço, ressecamento vaginal, mudanças na libido, ganho de peso, queda de cabelo ou infecções urinárias?)"
 
         request = HumanInterrupt(
             action_request=ActionRequest(
@@ -260,7 +201,82 @@ def create_agent_graph():
             answer = answer["args"]
 
         user_data = state.get("user_data", {})       
-        user_data["alimentacao"] = answer
+        user_data["sintomas_fisicos"] = answer
+        state["user_data"] = user_data
+
+        return state
+    
+    def ask_saude_emocional(state: StateSchema) -> StateSchema:
+
+        question = "Como você tem se sentido emocional e mentalmente? (Você notou flutuações de humor, ansiedade, irritabilidade, desânimo, ou dificuldade de memória e concentração?)"
+
+        request = HumanInterrupt(
+            action_request=ActionRequest(
+                action=question,
+                args={}
+            ),
+            config=interruptConfig
+        )
+
+        answer = interrupt([request])[0]
+
+        if answer["type"] == "ignore":
+            answer = "Não informado"
+        else:
+            answer = answer["args"]
+
+        user_data = state.get("user_data", {})       
+        user_data["saude_emocional"] = answer
+        state["user_data"] = user_data
+
+        return state
+    
+    def ask_habitos_historico(state: StateSchema) -> StateSchema:
+
+        question = "Como estão seus hábitos de saúde e histórico médico? (Incluindo medicamentos ou suplementos que você usa, seu histórico pessoal ou familiar de doenças crônicas, especialmente câncer de mama, sua rotina de alimentação, exercícios, consumo de álcool ou fumo.)"
+
+        request = HumanInterrupt(
+            action_request=ActionRequest(
+                action=question,
+                args={}
+            ),
+            config=interruptConfig
+        )
+
+        answer = interrupt([request])[0]
+
+        if answer["type"] == "ignore":
+            answer = "Não informado"
+        else:
+            answer = answer["args"]
+
+        user_data = state.get("user_data", {})       
+        user_data["habitos_historico"] = answer
+        state["user_data"] = user_data
+
+        return state
+    
+    def ask_exames_tratamentos(state: StateSchema) -> StateSchema:
+
+        question = "Quando você realizou seus últimos exames preventivos e quais tratamentos você gostaria de discutir? (Como Papanicolau, mamografia e densitometria óssea. Você já tentou algo para os sintomas ou tem interesse em discutir opções, como a terapia de reposição hormonal?)"
+
+        request = HumanInterrupt(
+            action_request=ActionRequest(
+                action=question,
+                args={}
+            ),
+            config=interruptConfig
+        )
+
+        answer = interrupt([request])[0]
+
+        if answer["type"] == "ignore":
+            answer = "Não informado"
+        else:
+            answer = answer["args"]
+
+        user_data = state.get("user_data", {})       
+        user_data["exames_tratamentos"] = answer
         state["user_data"] = user_data
 
         return state
@@ -333,29 +349,41 @@ def create_agent_graph():
 
         system_message = SystemMessage(content=GUIDE_SYSTEM_PROMPT)
 
+        # Mapeamento das perguntas feitas ao usuário
+        questions_map = {
+            "email": "Qual é o seu email? (Usaremos para enviar o guia personalizado)",
+            "nome": "Qual é seu nome?",
+            "idade": "Qual é sua idade?",
+            "ciclo_menstrual": "Como está o seu ciclo menstrual? (Quando foi sua última menstruação, ela tem sido regular em frequência e fluxo? Você já completou 12 meses consecutivos sem menstruar?)",
+            "sintomas_fisicos": "Quais sintomas físicos novos ou incômodos você tem sentido? (Por exemplo: ondas de calor, suores noturnos, alterações no sono, cansaço, ressecamento vaginal, mudanças na libido, ganho de peso, queda de cabelo ou infecções urinárias?)",
+            "saude_emocional": "Como você tem se sentido emocional e mentalmente? (Você notou flutuações de humor, ansiedade, irritabilidade, desânimo, ou dificuldade de memória e concentração?)",
+            "habitos_historico": "Como estão seus hábitos de saúde e histórico médico? (Incluindo medicamentos ou suplementos que você usa, seu histórico pessoal ou familiar de doenças crônicas, especialmente câncer de mama, sua rotina de alimentação, exercícios, consumo de álcool ou fumo.)",
+            "exames_tratamentos": "Quando você realizou seus últimos exames preventivos e quais tratamentos você gostaria de discutir? (Como Papanicolau, mamografia e densitometria óssea. Você já tentou algo para os sintomas ou tem interesse em discutir opções, como a terapia de reposição hormonal?)"
+        }
+
         prompt_parts = [
-            "Crie um guia personalizado de menopausa com base nas seguintes informações:\n\n"
+            "Crie um guia personalizado de menopausa com base nas seguintes informações coletadas:\n\n"
         ]
 
-        # Filtrar campos que não devem ser incluídos no prompt
         filtered_data = {k: v for k, v in user_data.items() if k != "guide"}
 
         if not filtered_data or len(filtered_data) == 0:
-            # Se não houver dados, criar um guia genérico
+            # se não houver dados, criar um guia genérico
             prompt_parts.append("Informações do paciente: Dados não informados\n")
         else:
+            prompt_parts.append("=== PERGUNTAS E RESPOSTAS DA PACIENTE ===\n\n")
             for key, value in filtered_data.items():
-                pretty_key = key.replace("_", " ").capitalize()
-                # Evitar valores muito longos que possam causar problemas
-                if isinstance(value, str) and len(value) > 1000:
-                    value = value[:1000] + "..."
-                # Sanitizar o valor para evitar problemas com caracteres especiais
+                # Adiciona a pergunta correspondente
+                question = questions_map.get(key, key.replace("_", " ").capitalize())
+                
                 if value and value != "Não informado":
-                    prompt_parts.append(f"- {pretty_key}: {value}\n")
+                    prompt_parts.append(f"PERGUNTA: {question}\n")
+                    prompt_parts.append(f"RESPOSTA: {value}\n\n")
 
         prompt_parts.append(
             "\nGere o guia completo seguindo EXATAMENTE o formato especificado no system prompt, "
-            "incluindo os marcadores [INICIO_GUIA] e [FIM_GUIA]."
+            "incluindo os marcadores [INICIO_GUIA] e [FIM_GUIA]. "
+            "Use as perguntas e respostas acima como contexto para personalizar o guia de forma detalhada e relevante."
         )
 
         user_message = HumanMessage(content="".join(prompt_parts))
@@ -402,7 +430,6 @@ def create_agent_graph():
                 
                 response = AIMessage(content=full_response)
             
-            # Extrair apenas o conteúdo do guia (entre os marcadores)
             content = response.content
             guide_content = content
             
@@ -411,7 +438,6 @@ def create_agent_graph():
                 end_idx = content.find("[FIM_GUIA]")
                 guide_content = content[start_idx:end_idx].strip()
             
-            # Salvar apenas o conteúdo do guia (sem marcadores) no state
             if "user_data" not in state:
                 state["user_data"] = {}
             state["user_data"]["guide"] = guide_content
@@ -422,6 +448,7 @@ def create_agent_graph():
                 "messages": [response],
                 "user_data": state["user_data"]
             }
+        
         except Exception as e:
             print(f"[ERROR] Erro ao gerar guia: {str(e)}")
            
@@ -443,9 +470,11 @@ def create_agent_graph():
     graph.add_node(ask_email, name="ask_email")
     graph.add_node(ask_age, name="ask_age")
     graph.add_node(ask_name, name="ask_name")
-    graph.add_node(ask_period, name="ask_period")
-    graph.add_node(ask_sintomas, name="ask_sintomas")
-    graph.add_node(ask_alimentacao, name="ask_alimentacao")
+    graph.add_node(ask_ciclo_menstrual, name="ask_ciclo_menstrual")
+    graph.add_node(ask_sintomas_fisicos, name="ask_sintomas_fisicos")
+    graph.add_node(ask_saude_emocional, name="ask_saude_emocional")
+    graph.add_node(ask_habitos_historico, name="ask_habitos_historico")
+    graph.add_node(ask_exames_tratamentos, name="ask_exames_tratamentos")
     graph.add_node(show_user_data_node, name="show_user_data_node")
     graph.add_node(ask_confirmation, name="ask_confirmation")
     graph.add_node(generate_guide, name="generate_guide")
@@ -459,10 +488,12 @@ def create_agent_graph():
     graph.add_edge("guide_node", "ask_email")
     graph.add_edge("ask_email", "ask_name")
     graph.add_edge("ask_name", "ask_age")
-    graph.add_edge("ask_age", "ask_period")
-    graph.add_edge("ask_period", "ask_sintomas")
-    graph.add_edge("ask_sintomas", "ask_alimentacao")
-    graph.add_edge("ask_alimentacao", "show_user_data_node")
+    graph.add_edge("ask_age", "ask_ciclo_menstrual")
+    graph.add_edge("ask_ciclo_menstrual", "ask_sintomas_fisicos")
+    graph.add_edge("ask_sintomas_fisicos", "ask_saude_emocional")
+    graph.add_edge("ask_saude_emocional", "ask_habitos_historico")
+    graph.add_edge("ask_habitos_historico", "ask_exames_tratamentos")
+    graph.add_edge("ask_exames_tratamentos", "show_user_data_node")
     graph.add_edge("show_user_data_node", "ask_confirmation")
     graph.add_edge("tools_chat", "chat_node")
     graph.add_edge("generate_guide", END)
