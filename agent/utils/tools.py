@@ -172,7 +172,7 @@ def retrieve_information(query: str) -> str:
     
     print(f"[DEBUG] Síntese concluída ({len(final_response)} caracteres)")
 
-    return final_response
+    return "CONTEXTO RECUPERADO: \n\n" + final_response
 
 print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
 
