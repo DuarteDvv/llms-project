@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 from langchain.tools import tool, ToolRuntime
 from langgraph.prebuilt.interrupt import HumanInterrupt, HumanInterruptConfig, ActionRequest
 from qdrant_client import QdrantClient
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from sentence_transformers import SentenceTransformer
 
@@ -136,45 +135,14 @@ def retrieve_information(query: str) -> str:
             f"Resultados: {result['results']}\n"
         )
     
-    raw_documents = ''.join(consolidated_results)
-    
-    # LLM para sintetizar, filtrar e conectar as informações recuperadas
-    synthesis_prompt = f"""Você é um especialista em saúde da mulher e menopausa. 
+    final_response = (
+        f"Documentos recuperados para a consulta original e suas subconsultas:\n"
+        f"{''.join(consolidated_results)}\n"
+    )
 
-    Você recebeu documentos recuperados de múltiplas buscas sobre um mesmo tema. 
-    Sua tarefa é SINTETIZAR e CONECTAR essas informações de forma coerente e útil.
+    return "CONTEXTO RECUPERADO: (Sempre cite a fonte (link) do usado) \n" + final_response
 
-    INSTRUÇÕES:
-    1. Identifique os pontos principais e mais relevantes de todos os documentos
-    2. Elimine informações redundantes ou duplicadas
-    3. Conecte as informações de forma lógica e fluida
-    4. Organize o conteúdo em seções claras se apropriado
-    5. Mantenha a linguagem clara e acessível
-    6. Preserve informações técnicas importantes (medicamentos, tratamentos, etc.)
-    7. Se houver contradições, mencione ambas as perspectivas
-
-    CONSULTA ORIGINAL DO USUÁRIO:
-    {query}
-
-    DOCUMENTOS RECUPERADOS:
-    {raw_documents}
-
-    Forneça uma síntese integrada e bem conectada dessas informações:
-    """
-
-    print("[DEBUG] Sintetizando informações com LLM...")
-    
-    synthesis_response = llm_.invoke([
-        HumanMessage(content=synthesis_prompt)
-    ])
-    
-    final_response = synthesis_response.content
-    
-    print(f"[DEBUG] Síntese concluída ({len(final_response)} caracteres)")
-
-    return "CONTEXTO RECUPERADO: \n\n" + final_response
-
-print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
+#print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
 
 @tool
 def send_pdf(runtime: ToolRuntime) -> str:
