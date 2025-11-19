@@ -16,10 +16,18 @@ from langgraph.prebuilt.interrupt import HumanInterrupt, HumanInterruptConfig, A
 from qdrant_client import QdrantClient
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
-qdrant_client = QdrantClient()
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+COLLECTION_NAME = "Tide"
+
+qdrant_client = QdrantClient(
+    url=os.getenv("QDRANT_URL"),
+    api_key=os.getenv("QDRANT_API_KEY")
+)
 
 MODEL_NAME = "gemini-2.5-flash-lite"
 
@@ -91,21 +99,23 @@ def retrieve_information(query: str) -> str:
     def search_single_query(query_info):
         """Busca documentos para uma única query no Qdrant"""
         query_type, query_text = query_info
+
         try:
 
-            # Exemplo de como seria:
-            # results = qdrant_client.search(
-            #     collection_name="menopausa_docs",
-            #     query_vector=get_embedding(query_text),  # função para gerar embedding
-            #     limit=5
-            # )
+            
+            results = qdrant_client.query_points(
+                collection_name=COLLECTION_NAME,
+                query=embedding_model.encode(query_text).tolist(),  # função para gerar embedding
+                limit=2
+            )
             
             
             return {
                 "query_type": query_type,
                 "query_text": query_text,
-                "results": f"[Documentos encontrados para: {query_text}]"
+                "results": str(results.points)
             }
+        
         except Exception as e:
             print(f"[ERROR] Erro ao buscar {query_type}: {str(e)}")
             return {
@@ -126,14 +136,45 @@ def retrieve_information(query: str) -> str:
             f"Resultados: {result['results']}\n"
         )
     
-    final_response = (
-        f"Documentos recuperados para a consulta original e suas subconsultas:\n"
-        f"{''.join(consolidated_results)}\n"
-    )
+    raw_documents = ''.join(consolidated_results)
+    
+    # LLM para sintetizar, filtrar e conectar as informações recuperadas
+    synthesis_prompt = f"""Você é um especialista em saúde da mulher e menopausa. 
+
+    Você recebeu documentos recuperados de múltiplas buscas sobre um mesmo tema. 
+    Sua tarefa é SINTETIZAR e CONECTAR essas informações de forma coerente e útil.
+
+    INSTRUÇÕES:
+    1. Identifique os pontos principais e mais relevantes de todos os documentos
+    2. Elimine informações redundantes ou duplicadas
+    3. Conecte as informações de forma lógica e fluida
+    4. Organize o conteúdo em seções claras se apropriado
+    5. Mantenha a linguagem clara e acessível
+    6. Preserve informações técnicas importantes (medicamentos, tratamentos, etc.)
+    7. Se houver contradições, mencione ambas as perspectivas
+
+    CONSULTA ORIGINAL DO USUÁRIO:
+    {query}
+
+    DOCUMENTOS RECUPERADOS:
+    {raw_documents}
+
+    Forneça uma síntese integrada e bem conectada dessas informações:
+    """
+
+    print("[DEBUG] Sintetizando informações com LLM...")
+    
+    synthesis_response = llm_.invoke([
+        HumanMessage(content=synthesis_prompt)
+    ])
+    
+    final_response = synthesis_response.content
+    
+    print(f"[DEBUG] Síntese concluída ({len(final_response)} caracteres)")
 
     return final_response
 
-#retrieve.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?")
+print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
 
 @tool
 def send_pdf(runtime: ToolRuntime) -> str:
