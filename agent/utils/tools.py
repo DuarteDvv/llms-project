@@ -100,19 +100,27 @@ def retrieve_information(query: str) -> str:
         query_type, query_text = query_info
 
         try:
-
-            
             results = qdrant_client.query_points(
                 collection_name=COLLECTION_NAME,
-                query=embedding_model.encode(query_text).tolist(),  # função para gerar embedding
+                query=embedding_model.encode(query_text).tolist(),
                 limit=2
             )
             
+            # Extrair apenas texto e fonte de cada resultado
+            formatted_results = []
+            for idx, point in enumerate(results.points, 1):
+                texto = point.payload.get('texto', '[Texto não disponível]')
+                fonte = point.payload.get('fonte', '[Fonte não disponível]')
+                formatted_results.append({
+                    'numero': idx,
+                    'texto': texto,
+                    'fonte': fonte
+                })
             
             return {
                 "query_type": query_type,
                 "query_text": query_text,
-                "results": str(results.points)
+                "results": formatted_results
             }
         
         except Exception as e:
@@ -120,29 +128,46 @@ def retrieve_information(query: str) -> str:
             return {
                 "query_type": query_type,
                 "query_text": query_text,
-                "results": f"[Erro na busca: {str(e)}]"
+                "results": []
             }
 
     # 4 buscas em paralelo 
     with ThreadPoolExecutor(max_workers=4) as executor:
         search_results = list(executor.map(search_single_query, queries_to_search))
     
+    # Consolidar resultados de forma limpa e legível
     consolidated_results = []
     for result in search_results:
-        consolidated_results.append(
-            f"\n--- {result['query_type'].upper()} ---\n"
-            f"Query: {result['query_text']}\n"
-            f"Resultados: {result['results']}\n"
-        )
+        query_section = f"\n{'='*80}\n"
+        query_section += f"📍 TIPO: {result['query_type'].upper()}\n"
+        query_section += f"🔍 CONSULTA: {result['query_text']}\n"
+        query_section += f"{'-'*80}\n"
+        
+        if result['results']:
+            for doc in result['results']:
+                query_section += f"\n📄 DOCUMENTO {doc['numero']}:\n"
+                query_section += f"{doc['texto']}\n\n"
+                query_section += f"🔗 FONTE: {doc['fonte']}\n"
+                query_section += f"{'-'*80}\n"
+        else:
+            query_section += "⚠️ Nenhum documento encontrado.\n"
+            query_section += f"{'-'*80}\n"
+        
+        consolidated_results.append(query_section)
     
     final_response = (
-        f"Documentos recuperados para a consulta original e suas subconsultas:\n"
+        f"\n{'='*80}\n"
+        f"📚 DOCUMENTOS RECUPERADOS\n"
+        f"{'='*80}\n"
         f"{''.join(consolidated_results)}\n"
+        f"{'='*80}\n"
+        f"⚠️ IMPORTANTE: Sempre cite a fonte (link) das informações utilizadas.\n"
+        f"{'='*80}\n"
     )
 
-    return "CONTEXTO RECUPERADO: (Sempre cite a fonte (link) do usado) \n" + final_response
+    return final_response
 
-#print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
+print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
 
 @tool
 def send_pdf(runtime: ToolRuntime) -> str:
