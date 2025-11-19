@@ -28,7 +28,7 @@ def create_agent_graph():
         api_key=os.getenv("GOOGLE_API_KEY"),
         model=MODEL_NAME,
         temperature=0,
-        max_tokens=10000,
+        max_tokens=20000,
         timeout=None,
         max_retries=2,            
     )

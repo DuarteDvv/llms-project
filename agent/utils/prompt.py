@@ -3,9 +3,9 @@ CHAT_SYSTEM_PROMPT = """
 *Voce nao pode responder vazio de forma alguma*
 *Voce deve sempre usar a ferramenta retrieve_information para fundamentar suas respostas e colocar referencias (link) de todos os documentos usados/recuperados*
 *Nao esqueca das fontes (link) dos documentos usados/recuperados no formato:
-bold{Fontes}: \n  #um link por linha \n
-Link 1 \n
-Link 2 \n
+bold{Fontes}: \n 
+- Link 1 \n
+- Link 2 \n
 ...
 *
 
