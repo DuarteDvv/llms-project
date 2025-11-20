@@ -12,6 +12,7 @@ from langgraph.types import interrupt, Command
 from agent.utils.prompt import CHAT_SYSTEM_PROMPT, WELCOME_MESSAGE, ROUTER_PROMPT, GUIDE_SYSTEM_PROMPT
 from agent.utils.state import StateSchema
 from agent.utils.tools import TOOLS_CHAT
+import json
 
 MODEL_NAME = "gemini-2.5-flash"
 
@@ -75,19 +76,23 @@ def create_agent_graph():
 
         user_data = state.get("user_data", {})
 
-        question = "Qual é o seu email? (Usaremos para enviar o guia personalizado)"
-        answer = str(interrupt(question))
-        user_data["email"] = answer
+        questions_prompt = (
+            "Por favor, responda as seguintes perguntas pessoais:\n\n"
+            "1. Qual é seu nome?\n"
+            "2. Qual é sua idade?\n"
+            "3. Qual é o seu email? (Usaremos para enviar o guia personalizado)\n\n"
+        )
 
-        question = "Qual é seu nome?"
-        answer = str(interrupt(question))
-        user_data["nome"] = answer
+        # return a dictionary structured
+        answer = interrupt(questions_prompt)
 
-        question = "Qual é sua idade?"
-        answer = int(interrupt(question))
-        user_data["idade"] = answer
+        user_data["nome"] = answer.get("nome", "Não informado")
+        user_data["idade"] = answer.get("idade", "Não informado")
+        user_data["email"] = answer.get("email", "Não informado")
 
         state["user_data"] = user_data
+
+        print(f"[DEBUG] Dados pessoais coletados: {user_data}")
 
         return state
     
@@ -95,27 +100,34 @@ def create_agent_graph():
 
         user_data = state.get("user_data", {})
 
-        question = "Como está o seu ciclo menstrual? (Quando foi sua última menstruação, ela tem sido regular em frequência e fluxo? Você já completou 12 meses consecutivos sem menstruar?)"
-        answer = str(interrupt(question))
-        user_data["ciclo_menstrual"] = answer
+        questions_prompt = (
+            "Agora, por favor responda as seguintes perguntas sobre sua saúde:\n\n"
+            "1. Como está o seu ciclo menstrual? Ela tem sido regular em frequência e fluxo? "
+            "Você já completou 12 meses consecutivos sem menstruar?\n\n"
+            "2. Quais sintomas físicos novos ou incômodos você tem sentido? "
+            "(Por exemplo: ondas de calor, suores noturnos, alterações no sono, cansaço, ressecamento vaginal, "
+            "mudanças na libido, ganho de peso, queda de cabelo ou infecções urinárias)\n\n"
+            "3. Como você tem se sentido emocional e mentalmente? "
+            "(Flutuações de humor, ansiedade, irritabilidade, desânimo, dificuldade de memória e concentração)\n\n"
+            "4. Como estão seus hábitos de saúde e histórico médico? "
+            "(Medicamentos ou suplementos que você usa, histórico pessoal ou familiar de doenças crônicas, "
+            "especialmente câncer de mama, rotina de alimentação, exercícios, consumo de álcool ou fumo)\n\n"
+            "5. Quando você realizou seus últimos exames preventivos e quais tratamentos você gostaria de discutir? "
+            "(Papanicolau, mamografia e densitometria óssea. Você já tentou algo para os sintomas ou tem interesse "
+            "em discutir opções, como a terapia de reposição hormonal?)\n\n"
+        )
 
-        question = "Quais sintomas físicos novos ou incômodos você tem sentido? (Por exemplo: ondas de calor, suores noturnos, alterações no sono, cansaço, ressecamento vaginal, mudanças na libido, ganho de peso, queda de cabelo ou infecções urinárias?)"
-        answer = str(interrupt(question))
-        user_data["sintomas_fisicos"] = answer
+        answer = interrupt(questions_prompt)
 
-        question = "Como você tem se sentido emocional e mentalmente? (Você notou flutuações de humor, ansiedade, irritabilidade, desânimo, ou dificuldade de memória e concentração?)"
-        answer = str(interrupt(question))
-        user_data["saude_emocional"] = answer
-
-        question = "Como estão seus hábitos de saúde e histórico médico? (Incluindo medicamentos ou suplementos que você usa, seu histórico pessoal ou familiar de doenças crônicas, especialmente câncer de mama, sua rotina de alimentação, exercícios, consumo de álcool ou fumo.)"
-        answer = str(interrupt(question))
-        user_data["habitos_historico"] = answer
-
-        question = "Quando você realizou seus últimos exames preventivos e quais tratamentos você gostaria de discutir? (Como Papanicolau, mamografia e densitometria óssea. Você já tentou algo para os sintomas ou tem interesse em discutir opções, como a terapia de reposição hormonal?)"
-        answer = str(interrupt(question))
-        user_data["exames_tratamentos"] = answer
+        user_data["ciclo_menstrual"] = answer.get("ciclo_menstrual", "Não informado")
+        user_data["sintomas_fisicos"] = answer.get("sintomas_fisicos", "Não informado")
+        user_data["saude_emocional"] = answer.get("saude_emocional", "Não informado")
+        user_data["habitos_historico"] = answer.get("habitos_historico", "Não informado")
+        user_data["exames_tratamentos"] = answer.get("exames_tratamentos", "Não informado")
 
         state["user_data"] = user_data
+
+        print(f"[DEBUG] Dados de saúde coletados: {user_data}")
 
         return state
 
@@ -157,10 +169,9 @@ def create_agent_graph():
 
         question = "Voce confirma que essas informações estão corretas e completas para prosseguirmos com o guia?"
 
+        answer = interrupt(question)
 
-        answer = bool(interrupt(question))
-
-        state["confirmation"] = answer
+        state["confirmation"] = answer["confirmation"]
 
         return state
     
