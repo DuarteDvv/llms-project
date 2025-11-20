@@ -1,11 +1,13 @@
-from typing import Annotated, List, Optional, Dict, Any
+from typing import Annotated, Optional, Dict, Any
 from typing_extensions import TypedDict
-from langchain_core.documents import Document
-from langgraph.graph.message import add_messages
+import operator
+from typing import Annotated, TypedDict
+from langchain_core.messages import AnyMessage
+
 
 class StateSchema(TypedDict):
 
-    messages: Annotated[list, add_messages]
+    messages: Annotated[list[AnyMessage], operator.add]
     route: Optional[str]
 
     user_data: Optional[Dict[str, Any]]

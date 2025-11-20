@@ -167,7 +167,7 @@ def retrieve_information(query: str) -> str:
 
     return final_response
 
-print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
+#print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
 
 @tool
 def send_pdf(runtime: ToolRuntime) -> str:

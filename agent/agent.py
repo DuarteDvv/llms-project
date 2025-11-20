@@ -8,17 +8,10 @@ from pydantic import BaseModel
 from typing import Literal
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import interrupt, Command
-from langgraph.prebuilt.interrupt import HumanInterrupt, HumanInterruptConfig, ActionRequest
+
 from agent.utils.prompt import CHAT_SYSTEM_PROMPT, WELCOME_MESSAGE, ROUTER_PROMPT, GUIDE_SYSTEM_PROMPT
 from agent.utils.state import StateSchema
 from agent.utils.tools import TOOLS_CHAT
-
-interruptConfig = HumanInterruptConfig(
-    allow_ignore=True,    # permite ignorar a interrupção
-    allow_respond=True,   # permite feedback em texto
-    allow_edit=False,     # não permite edição
-    allow_accept=False     # não permite aceitação direta
-)
 
 MODEL_NAME = "gemini-2.5-flash"
 
@@ -33,10 +26,7 @@ def create_agent_graph():
         max_retries=2,            
     )
 
-    
-    
     graph = StateGraph(state_schema=StateSchema)
-
 
     def welcome_node(state: StateSchema) -> StateSchema:
 
@@ -81,202 +71,50 @@ def create_agent_graph():
             "messages": [AIMessage(content="Antes de prosseguirmos, gostaria de fazer algumas perguntas para personalizar melhor o guia para você.")]
         }
     
-    def ask_email(state: StateSchema) -> StateSchema:
-
-        question = "Qual é o seu email? (Usaremos para enviar o guia personalizado)"
-
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=interruptConfig
-        )
-
-        answer = interrupt([request])[0]
-
-        if answer["type"] == "ignore":
-            answer = "Não informado"
-        else:
-            answer = answer["args"]
-
-        user_data = state.get("user_data", {})       
-        user_data["email"] = answer
-        state["user_data"] = user_data
-
-        return state
-    
-    def ask_name(state: StateSchema) -> StateSchema:
-
-        question = "Qual é seu nome?"
-
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=interruptConfig
-        )
-
-        answer = interrupt([request])[0]
-
-        if answer["type"] == "ignore":
-            answer = "Não informado"
-        else:
-            answer = answer["args"]
-
-        user_data = state.get("user_data", {})       
-        user_data["nome"] = answer
-        state["user_data"] = user_data
-
-        return state
-    
-    def ask_age(state: StateSchema) -> StateSchema:
-
-        question = "Qual é sua idade?"
-
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=interruptConfig
-        )
-
-        answer = interrupt([request])[0]
-
-        if answer["type"] == "ignore":
-            answer = "Não informado"
-        else:
-            answer = answer["args"]
+    def personal_questions(state: StateSchema) -> StateSchema:
 
         user_data = state.get("user_data", {})
+
+        question = "Qual é o seu email? (Usaremos para enviar o guia personalizado)"
+        answer = str(interrupt(question))
+        user_data["email"] = answer
+
+        question = "Qual é seu nome?"
+        answer = str(interrupt(question))
+        user_data["nome"] = answer
+
+        question = "Qual é sua idade?"
+        answer = int(interrupt(question))
         user_data["idade"] = answer
+
         state["user_data"] = user_data
 
         return state
     
-    def ask_ciclo_menstrual(state: StateSchema) -> StateSchema:
+    def health_questions(state: StateSchema) -> StateSchema:
+
+        user_data = state.get("user_data", {})
 
         question = "Como está o seu ciclo menstrual? (Quando foi sua última menstruação, ela tem sido regular em frequência e fluxo? Você já completou 12 meses consecutivos sem menstruar?)"
-
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=interruptConfig
-        )
-
-        answer = interrupt([request])[0]
-
-        if answer["type"] == "ignore":
-            answer = "Não informado"
-        else:
-            answer = answer["args"]
-
-        user_data = state.get("user_data", {})       
+        answer = str(interrupt(question))
         user_data["ciclo_menstrual"] = answer
-        state["user_data"] = user_data
-
-        return state
-    
-    def ask_sintomas_fisicos(state: StateSchema) -> StateSchema:
 
         question = "Quais sintomas físicos novos ou incômodos você tem sentido? (Por exemplo: ondas de calor, suores noturnos, alterações no sono, cansaço, ressecamento vaginal, mudanças na libido, ganho de peso, queda de cabelo ou infecções urinárias?)"
-
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=interruptConfig
-        )
-
-        answer = interrupt([request])[0]
-
-        if answer["type"] == "ignore":
-            answer = "Não informado"
-        else:
-            answer = answer["args"]
-
-        user_data = state.get("user_data", {})       
+        answer = str(interrupt(question))
         user_data["sintomas_fisicos"] = answer
-        state["user_data"] = user_data
-
-        return state
-    
-    def ask_saude_emocional(state: StateSchema) -> StateSchema:
 
         question = "Como você tem se sentido emocional e mentalmente? (Você notou flutuações de humor, ansiedade, irritabilidade, desânimo, ou dificuldade de memória e concentração?)"
-
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=interruptConfig
-        )
-
-        answer = interrupt([request])[0]
-
-        if answer["type"] == "ignore":
-            answer = "Não informado"
-        else:
-            answer = answer["args"]
-
-        user_data = state.get("user_data", {})       
+        answer = str(interrupt(question))
         user_data["saude_emocional"] = answer
-        state["user_data"] = user_data
-
-        return state
-    
-    def ask_habitos_historico(state: StateSchema) -> StateSchema:
 
         question = "Como estão seus hábitos de saúde e histórico médico? (Incluindo medicamentos ou suplementos que você usa, seu histórico pessoal ou familiar de doenças crônicas, especialmente câncer de mama, sua rotina de alimentação, exercícios, consumo de álcool ou fumo.)"
-
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=interruptConfig
-        )
-
-        answer = interrupt([request])[0]
-
-        if answer["type"] == "ignore":
-            answer = "Não informado"
-        else:
-            answer = answer["args"]
-
-        user_data = state.get("user_data", {})       
+        answer = str(interrupt(question))
         user_data["habitos_historico"] = answer
-        state["user_data"] = user_data
-
-        return state
-    
-    def ask_exames_tratamentos(state: StateSchema) -> StateSchema:
 
         question = "Quando você realizou seus últimos exames preventivos e quais tratamentos você gostaria de discutir? (Como Papanicolau, mamografia e densitometria óssea. Você já tentou algo para os sintomas ou tem interesse em discutir opções, como a terapia de reposição hormonal?)"
-
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=interruptConfig
-        )
-
-        answer = interrupt([request])[0]
-
-        if answer["type"] == "ignore":
-            answer = "Não informado"
-        else:
-            answer = answer["args"]
-
-        user_data = state.get("user_data", {})       
+        answer = str(interrupt(question))
         user_data["exames_tratamentos"] = answer
+
         state["user_data"] = user_data
 
         return state
@@ -319,25 +157,8 @@ def create_agent_graph():
 
         question = "Voce confirma que essas informações estão corretas e completas para prosseguirmos com o guia?"
 
-        request = HumanInterrupt(
-            action_request=ActionRequest(
-                action=question,
-                args={}
-            ),
-            config=HumanInterruptConfig(
-                allow_ignore=True,
-                allow_respond=False,
-                allow_edit=False,
-                allow_accept=True
-            )
-        )
 
-        answer = interrupt([request])[0]
-
-        if answer["type"] == "ignore":
-            answer = False
-        else:
-            answer = True
+        answer = bool(interrupt(question))
 
         state["confirmation"] = answer
 
@@ -467,14 +288,8 @@ def create_agent_graph():
     graph.add_node(tool_node, name="tools_chat")
     graph.add_node(router_node, name="router_node")
     graph.add_node(guide_node, name="guide_node")
-    graph.add_node(ask_email, name="ask_email")
-    graph.add_node(ask_age, name="ask_age")
-    graph.add_node(ask_name, name="ask_name")
-    graph.add_node(ask_ciclo_menstrual, name="ask_ciclo_menstrual")
-    graph.add_node(ask_sintomas_fisicos, name="ask_sintomas_fisicos")
-    graph.add_node(ask_saude_emocional, name="ask_saude_emocional")
-    graph.add_node(ask_habitos_historico, name="ask_habitos_historico")
-    graph.add_node(ask_exames_tratamentos, name="ask_exames_tratamentos")
+    graph.add_node(personal_questions, name="personal_questions")
+    graph.add_node(health_questions, name="health_questions")
     graph.add_node(show_user_data_node, name="show_user_data_node")
     graph.add_node(ask_confirmation, name="ask_confirmation")
     graph.add_node(generate_guide, name="generate_guide")
@@ -485,15 +300,9 @@ def create_agent_graph():
  
     graph.add_edge("welcome_node", END)
     graph.add_edge("chat_node", END)
-    graph.add_edge("guide_node", "ask_email")
-    graph.add_edge("ask_email", "ask_name")
-    graph.add_edge("ask_name", "ask_age")
-    graph.add_edge("ask_age", "ask_ciclo_menstrual")
-    graph.add_edge("ask_ciclo_menstrual", "ask_sintomas_fisicos")
-    graph.add_edge("ask_sintomas_fisicos", "ask_saude_emocional")
-    graph.add_edge("ask_saude_emocional", "ask_habitos_historico")
-    graph.add_edge("ask_habitos_historico", "ask_exames_tratamentos")
-    graph.add_edge("ask_exames_tratamentos", "show_user_data_node")
+    graph.add_edge("guide_node", "personal_questions")
+    graph.add_edge("personal_questions", "health_questions")
+    graph.add_edge("health_questions", "show_user_data_node")
     graph.add_edge("show_user_data_node", "ask_confirmation")
     graph.add_edge("tools_chat", "chat_node")
     graph.add_edge("generate_guide", END)
@@ -501,12 +310,12 @@ def create_agent_graph():
     graph.add_conditional_edges("chat_node", tools_condition, {"tools": "tools_chat", "__end__": "__end__"})
 
 
-    def data_condition(state:  StateSchema) -> Literal["ask_email", "generate_guide"]:
+    def data_condition(state:  StateSchema) -> Literal["personal_questions", "generate_guide"]:
 
         if state.get("confirmation"):
             return "generate_guide"
         else:
-            return "ask_email"
+            return "personal_questions"
 
     graph.add_conditional_edges("ask_confirmation", data_condition)
 
@@ -535,7 +344,4 @@ def create_agent_graph():
     return compiled_graph
 
 
-   
 graph = create_agent_graph()
-
-    
