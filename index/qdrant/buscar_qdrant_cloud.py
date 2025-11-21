@@ -1,13 +1,15 @@
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
+import os
 
 # ==== CONFIGURAÇÕES ====
 MODEL_NAME = "all-MiniLM-L6-v2"
 COLLECTION_NAME = "Tide"
 
 # Substitua com os dados do seu Qdrant Cloud
-QDRANT_URL = "https://***Substituir***.aws.cloud.qdrant.io"
-QDRANT_API_KEY = ""
+# Substitua pelos seus dados do Qdrant Cloud
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 print("🔹 Conectando ao Qdrant Cloud...")
 qdrant = QdrantClient(
