@@ -16,12 +16,29 @@ from langgraph.prebuilt.interrupt import HumanInterrupt, HumanInterruptConfig, A
 from qdrant_client import QdrantClient
 from concurrent.futures import ThreadPoolExecutor
 from sentence_transformers import SentenceTransformer
+from google import genai
+import numpy as np
 
 load_dotenv()
 
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
-embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+GEMINI_EMBEDD = True
 COLLECTION_NAME = "Tide"
+EMBED_DIM = 768
+
+if GEMINI_EMBEDD:
+    EMBEDDING_MODEL_NAME = "text-embedding-004"
+    embedding_model = genai.Client(api_key=os.getenv("GOOGLE_GENAI_API_KEY"))
+else:
+    EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+    embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+
+
+def normalize(vec):
+    v = np.array(vec)
+    norm = np.linalg.norm(v)
+    if norm == 0:
+        return v.tolist()
+    return (v / norm).tolist()
 
 qdrant_client = QdrantClient(
     url=os.getenv("QDRANT_URL"),
@@ -99,10 +116,22 @@ def retrieve_information(query: str) -> str:
         """Busca documentos para uma única query no Qdrant"""
         query_type, query_text = query_info
 
+        if GEMINI_EMBEDD:
+            embedding = normalize(embedding_model.models.embed_content(
+                model=EMBEDDING_MODEL_NAME,
+                contents=[query_text],
+                config=genai.types.EmbedContentConfig(
+                    task_type="RETRIEVAL_DOCUMENT",
+                    output_dimensionality=EMBED_DIM
+                )
+            ).embeddings[0].values)
+        else:
+            embedding = embedding_model.encode(query_text).tolist()
+
         try:
             results = qdrant_client.query_points(
                 collection_name=COLLECTION_NAME,
-                query=embedding_model.encode(query_text).tolist(),
+                query=embedding,
                 limit=2
             )
             
@@ -167,7 +196,7 @@ def retrieve_information(query: str) -> str:
 
     return final_response
 
-#print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
+print(retrieve_information.invoke("Quais são as opções de tratamento para sintomas de menopausa e como elas afetam a saúde óssea?"))
 
 @tool
 def send_pdf(runtime: ToolRuntime) -> str:

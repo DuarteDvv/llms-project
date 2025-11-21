@@ -1,0 +1,4 @@
+1. Configure corretamente o .env seguindo o example.env
+2. Instale as dependencias usando seu gerenciador de pacotes favorito (uv ou pip)
+3. Na raiz do projeto, execute "langgraph dev"
+4. Uma URL para o langsmith será gerada no seu terminal, só abrir 
