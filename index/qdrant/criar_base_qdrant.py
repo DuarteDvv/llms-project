@@ -4,6 +4,7 @@ from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+import os
 
 # ==== CONFIGURAÇÕES ====
 CHUNKS_PATH = Path("index/files/doc_chunks.jsonl")
@@ -11,8 +12,8 @@ COLLECTION_NAME = "Tide"
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 # Substitua pelos seus dados do Qdrant Cloud
-QDRANT_URL = "https://***Substituir***.aws.cloud.qdrant.io"
-QDRANT_API_KEY = ""
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 print("🔹 Carregando chunks...")
 chunks = []
