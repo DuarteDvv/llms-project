@@ -14,6 +14,10 @@ class StateSchema(TypedDict):
     debug: Optional[Any]
     confirmation: Optional[bool]
     
+    # Campos para avaliação e reformulação de respostas
+    pass_evaluation: Optional[bool]
+    problem: Optional[str]
+    
 
 
 

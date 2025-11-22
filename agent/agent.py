@@ -66,6 +66,82 @@ def create_agent_graph():
         }
     
     
+    def evaluate_response_node(state: StateSchema) -> StateSchema:
+        """Avalia se a resposta do chat está adequada"""
+        
+        class EvaluationOutput(BaseModel):
+            pass_evaluation: bool
+            problem: str
+        
+        evaluation_prompt = """Você é um avaliador de qualidade de respostas sobre menopausa e saúde feminina.
+
+        ⚠️ IMPORTANTE: AVALIE APENAS A ÚLTIMA MENSAGEM DO ASSISTENTE (a mais recente na conversa).
+        IGNORE completamente mensagens anteriores do assistente - elas são apenas contexto histórico.
+
+        O histórico da conversa está disponível apenas para você entender o contexto, mas você deve avaliar EXCLUSIVAMENTE a resposta mais recente do assistente.
+
+        Critérios de avaliação para A ÚLTIMA MENSAGEM DO ASSISTENTE:
+        1. A resposta está clara, educada e bem estruturada?
+        2. As informações são precisas e relevantes ao contexto da pergunta atual?
+        3. Se ferramentas foram chamadas, os resultados foram bem utilizados?
+        4. A resposta atende adequadamente à pergunta do usuário?
+        5. A resposta NÃO está vazia ou incompleta?
+
+        Retorne:
+        - pass_evaluation: true se a ÚLTIMA resposta está adequada, false se precisa de melhorias graves ou reformulação
+        - problem: string vazia se pass_evaluation=true, ou uma descrição específica e objetiva do que precisa ser melhorado NA ÚLTIMA RESPOSTA
+
+        Não seja excessivamente rigoroso com detalhes menores. Foque em problemas críticos que realmente comprometem a qualidade da resposta."""
+
+        system_message = SystemMessage(content=evaluation_prompt)
+        
+        response = llm.with_structured_output(EvaluationOutput).invoke([system_message, *state["messages"]])
+        
+        return {
+            "pass_evaluation": response.pass_evaluation,
+            "problem": response.problem
+        }
+    
+    
+    def reformulate_response_node(state: StateSchema) -> StateSchema:
+        """Reformula a resposta com base no problema identificado"""
+        
+        reformulation_prompt = f"""Você é um assistente especializado em saúde feminina e menopausa.
+
+        ⚠️ ATENÇÃO: Você DEVE reformular APENAS A ÚLTIMA MENSAGEM que você (o assistente) enviou.
+
+        PROBLEMA IDENTIFICADO NA ÚLTIMA RESPOSTA:
+        {state.get("problem", "Resposta precisa ser melhorada")}
+
+        📋 INSTRUÇÕES:
+        1. Analise o histórico da conversa para entender o contexto
+        2. Identifique qual foi a ÚLTIMA pergunta/solicitação do usuário
+        3. Reformule APENAS sua última resposta para corrigir o problema identificado
+        4. NÃO repita ou reformule respostas antigas - foque exclusivamente na mais recente
+        5. Sua nova resposta NÃO pode estar vazia
+
+        ✅ Mantenha na resposta reformulada:
+        - Relevância ao contexto atual da conversa
+        - Informações precisas e empáticas
+        - Tom adequado ao tema de saúde feminina
+        - Clareza e completude
+        - Educação e profissionalismo
+
+        Retorne APENAS a resposta reformulada, sem explicações adicionais sobre o que você mudou."""
+
+        system_message = SystemMessage(content=reformulation_prompt)
+        
+        response = llm.invoke([system_message, *state["messages"], HumanMessage(content="Reformule sua última resposta agora corrigindo o problema identificado. Retorne APENAS a resposta reformulada.")])        
+        # Remove a última mensagem (resposta inadequada) e adiciona a reformulada
+        new_messages = state["messages"][:-1] + [response]
+        
+        return {
+            "messages": new_messages,
+            "pass_evaluation": False,  # Reset para nova avaliação
+            "problem": ""  # Limpa o problema
+        }
+    
+    
     def guide_node(state: StateSchema) -> StateSchema:
 
         return {
@@ -304,21 +380,23 @@ def create_agent_graph():
     graph.add_node(show_user_data_node, name="show_user_data_node")
     graph.add_node(ask_confirmation, name="ask_confirmation")
     graph.add_node(generate_guide, name="generate_guide")
+    graph.add_node(evaluate_response_node, name="evaluate_response_node")
+    graph.add_node(reformulate_response_node, name="reformulate_response_node")
 
 
 
    
  
     graph.add_edge("welcome_node", END)
-    graph.add_edge("chat_node", END)
     graph.add_edge("guide_node", "personal_questions")
     graph.add_edge("personal_questions", "health_questions")
     graph.add_edge("health_questions", "show_user_data_node")
     graph.add_edge("show_user_data_node", "ask_confirmation")
     graph.add_edge("tools_chat", "chat_node")
     graph.add_edge("generate_guide", END)
+    graph.add_edge("reformulate_response_node", "evaluate_response_node")
 
-    graph.add_conditional_edges("chat_node", tools_condition, {"tools": "tools_chat", "__end__": "__end__"})
+    graph.add_conditional_edges("chat_node", tools_condition, {"tools": "tools_chat", "__end__": "evaluate_response_node"})
 
 
     def data_condition(state:  StateSchema) -> Literal["personal_questions", "generate_guide"]:
@@ -329,6 +407,16 @@ def create_agent_graph():
             return "personal_questions"
 
     graph.add_conditional_edges("ask_confirmation", data_condition)
+    
+    def evaluation_condition(state: StateSchema) -> Literal["reformulate_response_node", "__end__"]:
+        """Decide se a resposta precisa ser reformulada ou está aprovada"""
+        
+        if state.get("pass_evaluation", False):
+            return "__end__"
+        else:
+            return "reformulate_response_node"
+    
+    graph.add_conditional_edges("evaluate_response_node", evaluation_condition)
 
     def welcome_condition(state:  StateSchema) -> Literal["router_node", "welcome_node"]:
 
