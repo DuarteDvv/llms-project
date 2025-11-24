@@ -132,7 +132,7 @@ def retrieve_information(query: str) -> str:
             results = qdrant_client.query_points(
                 collection_name=COLLECTION_NAME,
                 query=embedding,
-                limit=2
+                limit=1
             )
             
             # Extrair apenas texto e fonte de cada resultado

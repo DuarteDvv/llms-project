@@ -61,6 +61,19 @@ def create_agent_graph():
 
         response =  llm.bind_tools(tools=TOOLS_CHAT).invoke([system_prompt, *state["messages"]])
 
+        # Normalizar o conteúdo da resposta se vier como array
+        if hasattr(response, 'content') and isinstance(response.content, list):
+            # Concatenar todos os textos do array de conteúdo
+            text_parts = []
+            for item in response.content:
+                if isinstance(item, dict) and item.get('type') == 'text':
+                    text_parts.append(item.get('text', ''))
+                elif isinstance(item, str):
+                    text_parts.append(item)
+            
+            # Criar nova mensagem com conteúdo unificado
+            response.content = ''.join(text_parts)
+
         return {
             "messages": [response],
         }
